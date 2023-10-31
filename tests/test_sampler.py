@@ -21,12 +21,16 @@ def format_list(items):
 
 
 @pytest.mark.parametrize("mode", ["truncate", "pad", "uneven"])
-@pytest.mark.parametrize("strategy", ["block", "shard"])
+@pytest.mark.parametrize("strategy", ["block", "shard", "shard-stripe"])
 @pytest.mark.parametrize("num_replicas", [1, 2, 3, 4, 5])
 @pytest.mark.parametrize("shuffle", [False, True], ids=["sequential", "shuffled"])
 def test_feistel_sampler(mode, strategy, num_replicas, shuffle):
     num_items = 97
     batch_size = 4
+    stripe_batches = False
+    if strategy == "shard-stripe":
+        strategy = "shard"
+        stripe_batches = True
 
     dataset = DummyDataset(num_items)
 
@@ -40,6 +44,7 @@ def test_feistel_sampler(mode, strategy, num_replicas, shuffle):
             rank=rank,
             shuffle=shuffle,
             mode=mode,
+            batch_size=batch_size if stripe_batches else 1,
             strategy=strategy,
         )
         rank_lengths.append(len(sampler))

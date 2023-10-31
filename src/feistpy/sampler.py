@@ -54,6 +54,7 @@ class FeistelSampler(Iterable[int]):
         dataset: Union["Dataset", int],
         num_replicas: int = 1,
         rank: int = 0,
+        batch_size: int = 1,
         shuffle: bool = True,
         seed: int = 0,
         rounds: int = 8,
@@ -66,6 +67,7 @@ class FeistelSampler(Iterable[int]):
             dataset: The source dataset or its length.
             num_replicas: Number of replicas (processes) to sample for. Default is 1.
             rank: Rank of the current process. Default is 0.
+            batch_size: Batch size, only effective when strategy="shard". Default is 1.
             shuffle: If True, shuffles the dataset. Default is True.
             seed: Seed for the Feistel permutation (used if shuffle=True). Default is 0.
             rounds: Number of rounds for the Feistel permutation (used if shuffle=True). Default is 8.
@@ -88,6 +90,7 @@ class FeistelSampler(Iterable[int]):
 
         self.num_replicas = num_replicas
         self.rank = rank
+        self.batch_size = batch_size
         self.epoch = 0
         self.rounds = rounds
         self.mode = mode
@@ -123,7 +126,11 @@ class FeistelSampler(Iterable[int]):
 
     def _shard_iter(self) -> Iterator[int]:
         num_samples = self.num_items if self.mode == RoundingMode.uneven else self.total_samples
-        index_iter = iter(range(self.rank, num_samples, self.num_replicas))
+        start = self.rank * self.batch_size
+        stride = self.num_replicas * self.batch_size
+        index_iter = iter(range(start, num_samples, stride))
+        if self.batch_size > 1:
+            index_iter = (i + j for i in index_iter for j in range(self.batch_size) if i + j < num_samples)
         if self.shuffle:
             perm = Permutation(num_samples, self.rounds, self.seed + self.epoch)
             index_iter = (perm[i] for i in index_iter)
