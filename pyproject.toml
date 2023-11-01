@@ -1,6 +1,6 @@
 [project]
 name = "feistpy"
-version = "1.1.0"
+version = "1.1.1"
 description = "Fiestel sampling for PyTorch"
 requires-python = ">=3.8"
 dependencies = ["pygfc~=1.0.5"]

@@ -99,19 +99,21 @@ class FeistelSampler(Iterable[int]):
         self.strategy = strategy
 
         self.num_items = int(dataset) if isinstance(dataset, int) else len(dataset)  # type: ignore
-        if self.num_items % self.num_replicas != 0 and self.mode != RoundingMode.truncate:
+        bz = 1 if self.strategy == SamplingStrategy.block else self.batch_size
+        if self.mode != RoundingMode.truncate:
             # Dataset is not evenly divisible and we're not truncating, so round up.
-            self.block_size = math.ceil(self.num_items / self.num_replicas)
+            self.block_size = math.ceil(self.num_items / self.num_replicas / bz) * bz
         else:
             # Dataset is evenly divisible or we're truncating, so round down.
-            self.block_size = self.num_items // self.num_replicas
+            self.block_size = math.floor(self.num_items / self.num_replicas / bz) * bz
 
         if self.mode == RoundingMode.uneven and self.rank == self.num_replicas - 1:
             # Uneven mode, last replica gets the remainder.
             self.replica_samples = self.num_items - self.block_size * (self.num_replicas - 1)
+            self.total_samples = self.num_items
         else:
             self.replica_samples = self.block_size
-        self.total_samples = self.block_size * self.num_replicas
+            self.total_samples = self.block_size * self.num_replicas
 
     def _block_iter(self) -> Iterator[int]:
         start = self.rank * self.block_size
@@ -130,7 +132,9 @@ class FeistelSampler(Iterable[int]):
         stride = self.num_replicas * self.batch_size
         index_iter = iter(range(start, num_samples, stride))
         if self.batch_size > 1:
-            index_iter = (i + j for i in index_iter for j in range(self.batch_size) if i + j < num_samples)
+            index_iter = (
+                i + j for i in index_iter for j in range(self.batch_size) if i + j < num_samples
+            )
         if self.shuffle:
             perm = Permutation(num_samples, self.rounds, self.seed + self.epoch)
             index_iter = (perm[i] for i in index_iter)
