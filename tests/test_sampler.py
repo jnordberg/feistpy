@@ -127,14 +127,20 @@ def test_feistel_sampler(mode, strategy, num_replicas, num_items, batch_size, sh
 
     if strategy == "shard" and not shuffle:
         if mode == "truncate":
-            expected_num_items = (
-                math.floor(num_items / num_replicas / sampler_bz) * num_replicas * sampler_bz
-            )
+            if num_replicas > 1:
+                expected_num_items = (
+                    math.floor(num_items / num_replicas / sampler_bz) * num_replicas * sampler_bz
+                )
+            else:
+                expected_num_items = num_items
             assert len(all_items) == expected_num_items
         elif mode == "pad":
-            expected_num_items = (
-                math.ceil(num_items / num_replicas / sampler_bz) * num_replicas * sampler_bz
-            )
+            if num_replicas > 1:
+                expected_num_items = (
+                    math.ceil(num_items / num_replicas / sampler_bz) * num_replicas * sampler_bz
+                )
+            else:
+                expected_num_items = num_items
             assert len(all_items) == expected_num_items
         elif mode == "uneven":
             assert len(all_items) == num_items
